@@ -118,6 +118,11 @@
       border-color: var(--accent-hover);
     }
 
+    .word-by-word-selector button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
     .word-span {
       display: inline-block;
       margin: 0 0.15em;
@@ -322,6 +327,10 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
+    }
+
+    .control-btn.word-control {
+      flex: 0.7;
     }
 
     .control-btn:hover:not(:disabled) {
@@ -615,6 +624,8 @@
       <div class="controls">
         <button class="control-btn" id="playBtn">🔊 Play</button>
         <button class="control-btn" id="recordBtn">🎤 Record</button>
+        <button class="control-btn word-control" id="playWordBtn">🔤 Play Word</button>
+        <button class="control-btn word-control" id="nextWordBtn">⏭ Next Word</button>
         <button class="control-btn" id="nextBtn">⏭ Next</button>
       </div>
 
@@ -686,6 +697,7 @@
         voiceLang: 'fr',
         lines: [],
         currentIndex: 0,
+        currentWordIndex: 0,
         scores: [],
         isRecording: false,
         recognition: null,
@@ -729,7 +741,9 @@
         summaryWorstLine: document.getElementById('summaryWorstLine'),
         summaryWorstPreview: document.getElementById('summaryWorstPreview'),
         practiceAgainBtn: document.getElementById('practiceAgainBtn'),
-        wordByWordBtn: document.getElementById('wordByWordBtn')
+        wordByWordBtn: document.getElementById('wordByWordBtn'),
+        playWordBtn: document.getElementById('playWordBtn'),
+        nextWordBtn: document.getElementById('nextWordBtn')
       };
 
       function stripPunctuation(text) {
@@ -945,6 +959,7 @@
         els.inputError.textContent = '';
         state.lines = parsed;
         state.currentIndex = 0;
+        state.currentWordIndex = 0;
         state.scores = new Array(parsed.length).fill(null);
 
         els.inputSection.style.display = 'none';
@@ -955,6 +970,7 @@
         updateProgress();
         updateNextButton();
         hideScore();
+        updateWordByWordBtnState();
       }
 
       function advanceLine() {
@@ -962,6 +978,9 @@
           cancelWordByWord();
           showWarning('Word-by-word playback cancelled.');
           setTimeout(() => showWarning(''), 1500);
+        }
+        if (window.speechSynthesis) {
+          window.speechSynthesis.cancel();
         }
 
         const isLast = state.currentIndex >= state.lines.length - 1;
@@ -973,6 +992,7 @@
         els.currentLine.classList.add('slide-out');
         setTimeout(() => {
           state.currentIndex++;
+          state.currentWordIndex = 0;
           updateTeleprompter();
           updateProgress();
           updateNextButton();
@@ -984,6 +1004,46 @@
       function resetCurrentLineText() {
         const current = state.lines[state.currentIndex] || '';
         els.currentLine.textContent = truncateLine(current, 100);
+      }
+
+      function updateWordByWordBtnState() {
+        const hasText = els.lyricsInput.value.trim().length > 0;
+        const hasLines = state.lines.length > 0;
+        els.wordByWordBtn.disabled = !(hasText || hasLines);
+      }
+
+      function getWordsForCurrentLine() {
+        const line = state.lines[state.currentIndex] || '';
+        return line.split(' ').filter(w => w.length > 0);
+      }
+
+      function resetWordState() {
+        state.currentWordIndex = 0;
+        if (state.lines.length > 0) {
+          resetCurrentLineText();
+        }
+      }
+
+      function clearWordHighlights() {
+        const spans = els.currentLine.querySelectorAll('.word-span');
+        spans.forEach(span => {
+          span.classList.remove('active', 'done');
+        });
+      }
+
+      function highlightWord(index) {
+        const spans = els.currentLine.querySelectorAll('.word-span');
+        spans.forEach((span, i) => {
+          span.classList.remove('active');
+          if (i < index) {
+            span.classList.add('done');
+          } else {
+            span.classList.remove('done');
+          }
+        });
+        if (spans[index]) {
+          spans[index].classList.add('active');
+        }
       }
 
       function renderWordSpans(words) {
@@ -1070,7 +1130,74 @@
         speakNextWord(words, 0, token);
       }
 
+      function playWord() {
+        if (!window.speechSynthesis) return;
+        const words = getWordsForCurrentLine();
+        if (words.length === 0) return;
+
+        if (state.wordByWordPlaying) {
+          cancelWordByWord();
+        }
+        window.speechSynthesis.cancel();
+
+        if (els.currentLine.querySelectorAll('.word-span').length === 0) {
+          renderWordSpans(words);
+        }
+
+        if (state.currentWordIndex >= words.length) {
+          state.currentWordIndex = 0;
+        }
+
+        highlightWord(state.currentWordIndex);
+
+        const utterance = new SpeechSynthesisUtterance(words[state.currentWordIndex]);
+        utterance.lang = state.language;
+        const voice = getVoiceForLanguage();
+        if (voice) utterance.voice = voice;
+        utterance.rate = 0.85;
+
+        els.playWordBtn.disabled = true;
+        utterance.onend = function() {
+          const spans = els.currentLine.querySelectorAll('.word-span');
+          if (spans[state.currentWordIndex]) {
+            spans[state.currentWordIndex].classList.remove('active');
+            spans[state.currentWordIndex].classList.add('done');
+          }
+          els.playWordBtn.disabled = false;
+        };
+        utterance.onerror = function() {
+          els.playWordBtn.disabled = false;
+        };
+
+        window.speechSynthesis.speak(utterance);
+      }
+
+      function nextWord() {
+        const words = getWordsForCurrentLine();
+        if (words.length === 0) return;
+
+        if (els.currentLine.querySelectorAll('.word-span').length === 0) {
+          renderWordSpans(words);
+        }
+
+        const spans = els.currentLine.querySelectorAll('.word-span');
+
+        const allDone = Array.from(spans).every(span => span.classList.contains('done'));
+        if (allDone) {
+          state.currentWordIndex = 0;
+          clearWordHighlights();
+          highlightWord(0);
+          return;
+        }
+
+        if (state.currentWordIndex < words.length - 1) {
+          state.currentWordIndex++;
+          highlightWord(state.currentWordIndex);
+        }
+      }
+
       function playCurrentLine() {
+        resetWordState();
         if (!window.speechSynthesis) return;
 
         if (state.wordByWordPlaying) {
@@ -1160,6 +1287,7 @@
         cancelWordByWord();
         state.lines = [];
         state.currentIndex = 0;
+        state.currentWordIndex = 0;
         state.scores = [];
         state.wordByWord = false;
         els.wordByWordBtn.classList.remove('selected');
@@ -1171,10 +1299,12 @@
         els.summarySection.classList.remove('active');
         els.progressBarFill.style.width = '0%';
         els.progressBarText.textContent = '0/0';
+        updateWordByWordBtnState();
       }
 
       function selectLanguage(btn) {
         cancelWordByWord();
+        state.currentWordIndex = 0;
         resetCurrentLineText();
         els.langButtons.forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
@@ -1191,6 +1321,7 @@
 
       initSpeechRecognition();
       selectLanguage(els.langButtons[0]);
+      updateWordByWordBtnState();
 
       els.langButtons.forEach(btn => {
         btn.addEventListener('click', () => selectLanguage(btn));
@@ -1202,14 +1333,19 @@
         if (state.wordByWordPlaying) {
           cancelWordByWord();
         }
+        state.currentWordIndex = 0;
+        resetCurrentLineText();
       }
 
       els.startBtn.addEventListener('click', startPractice);
       els.playBtn.addEventListener('click', playCurrentLine);
       els.recordBtn.addEventListener('click', startRecording);
+      els.playWordBtn.addEventListener('click', playWord);
+      els.nextWordBtn.addEventListener('click', nextWord);
       els.nextBtn.addEventListener('click', advanceLine);
       els.practiceAgainBtn.addEventListener('click', resetApp);
       els.wordByWordBtn.addEventListener('click', toggleWordByWord);
+      els.lyricsInput.addEventListener('input', updateWordByWordBtnState);
 
       // Keyboard shortcut: space to start/stop recording
       document.addEventListener('keydown', function(e) {
