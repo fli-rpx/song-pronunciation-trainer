@@ -123,6 +123,40 @@
       cursor: not-allowed;
     }
 
+    .speed-selector {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .speed-selector button {
+      flex: 1;
+      padding: 14px 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 10px;
+      border: 2px solid var(--accent);
+      background-color: transparent;
+      color: var(--text);
+      cursor: pointer;
+      transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+    }
+
+    .speed-selector button:hover {
+      background-color: rgba(124, 92, 252, 0.15);
+    }
+
+    .speed-selector button.selected {
+      background-color: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .speed-selector button.selected:hover {
+      background-color: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+
     .word-span {
       display: inline-block;
       margin: 0 0.15em;
@@ -551,6 +585,11 @@
         font-size: 0.9rem;
       }
 
+      .speed-selector button {
+        padding: 12px 4px;
+        font-size: 0.9rem;
+      }
+
       .line-current {
         font-size: 1.5rem;
         min-height: 2em;
@@ -599,6 +638,14 @@
 
     <div class="word-by-word-selector" id="wordByWordSelector">
       <button id="wordByWordBtn">🔤 Word by Word</button>
+    </div>
+
+    <div class="speed-selector" id="speedSelector">
+      <button data-rate="0.5">0.5x</button>
+      <button data-rate="0.75">0.75x</button>
+      <button data-rate="1.0" class="selected">1.0x</button>
+      <button data-rate="1.25">1.25x</button>
+      <button data-rate="1.5">1.5x</button>
     </div>
 
     <div id="warningBanner"></div>
@@ -705,7 +752,8 @@
         voices: [],
         wordByWord: false,
         wordByWordPlaying: false,
-        wordByWordToken: 0
+        wordByWordToken: 0,
+        speed: 1.0
       };
 
       const els = {
@@ -744,7 +792,8 @@
         practiceAgainBtn: document.getElementById('practiceAgainBtn'),
         wordByWordBtn: document.getElementById('wordByWordBtn'),
         playWordBtn: document.getElementById('playWordBtn'),
-        nextWordBtn: document.getElementById('nextWordBtn')
+        nextWordBtn: document.getElementById('nextWordBtn'),
+        speedButtons: document.querySelectorAll('#speedSelector button')
       };
 
       function stripPunctuation(text) {
@@ -1099,7 +1148,7 @@
         utterance.lang = state.language;
         const voice = getVoiceForLanguage();
         if (voice) utterance.voice = voice;
-        utterance.rate = 0.85;
+        utterance.rate = state.speed;
 
         utterance.onend = function() {
           if (state.wordByWordToken !== token) return;
@@ -1155,7 +1204,7 @@
         utterance.lang = state.language;
         const voice = getVoiceForLanguage();
         if (voice) utterance.voice = voice;
-        utterance.rate = 0.85;
+        utterance.rate = state.speed;
 
         els.playWordBtn.disabled = true;
         utterance.onend = function() {
@@ -1214,7 +1263,7 @@
           utterance.lang = state.language;
           const voice = getVoiceForLanguage();
           if (voice) utterance.voice = voice;
-          utterance.rate = 0.9;
+          utterance.rate = state.speed;
 
           els.playBtn.disabled = true;
           utterance.onend = function() {
@@ -1337,6 +1386,16 @@
         state.currentWordIndex = 0;
         resetCurrentLineText();
       }
+
+      function selectSpeed(btn) {
+        els.speedButtons.forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        state.speed = parseFloat(btn.dataset.rate);
+      }
+
+      els.speedButtons.forEach(btn => {
+        btn.addEventListener('click', () => selectSpeed(btn));
+      });
 
       els.startBtn.addEventListener('click', startPractice);
       els.playBtn.addEventListener('click', playCurrentLine);
