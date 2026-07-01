@@ -84,6 +84,59 @@
       border-color: var(--accent-hover);
     }
 
+    .word-by-word-selector {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .word-by-word-selector button {
+      flex: 1;
+      padding: 14px 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 10px;
+      border: 2px solid var(--accent);
+      background-color: transparent;
+      color: var(--text);
+      cursor: pointer;
+      transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+    }
+
+    .word-by-word-selector button:hover {
+      background-color: rgba(124, 92, 252, 0.15);
+    }
+
+    .word-by-word-selector button.selected {
+      background-color: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .word-by-word-selector button.selected:hover {
+      background-color: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+
+    .word-span {
+      display: inline-block;
+      margin: 0 0.15em;
+      transition: all 0.15s ease;
+    }
+
+    .word-span.active {
+      color: #7c5cfc;
+      font-weight: 700;
+      text-decoration: underline;
+      text-decoration-color: #7c5cfc;
+      text-underline-offset: 4px;
+    }
+
+    .word-span.done {
+      color: #00cc66;
+      opacity: 0.9;
+    }
+
     .card {
       background-color: var(--panel-bg);
       border: 1px solid var(--panel-border);
@@ -484,6 +537,11 @@
         font-size: 0.9rem;
       }
 
+      .word-by-word-selector button {
+        padding: 12px 4px;
+        font-size: 0.9rem;
+      }
+
       .line-current {
         font-size: 1.5rem;
         min-height: 2em;
@@ -527,6 +585,10 @@
       <button data-lang="fr-FR" data-name="French" data-voice-lang="fr">Français</button>
       <button data-lang="de-DE" data-name="German" data-voice-lang="de">Deutsch</button>
       <button data-lang="it-IT" data-name="Italian" data-voice-lang="it">Italiano</button>
+    </div>
+
+    <div class="word-by-word-selector" id="wordByWordSelector">
+      <button id="wordByWordBtn">🔤 Word by Word</button>
     </div>
 
     <div id="warningBanner"></div>
@@ -627,7 +689,10 @@
         scores: [],
         isRecording: false,
         recognition: null,
-        voices: []
+        voices: [],
+        wordByWord: false,
+        wordByWordPlaying: false,
+        wordByWordToken: 0
       };
 
       const els = {
@@ -663,7 +728,8 @@
         summaryBestPreview: document.getElementById('summaryBestPreview'),
         summaryWorstLine: document.getElementById('summaryWorstLine'),
         summaryWorstPreview: document.getElementById('summaryWorstPreview'),
-        practiceAgainBtn: document.getElementById('practiceAgainBtn')
+        practiceAgainBtn: document.getElementById('practiceAgainBtn'),
+        wordByWordBtn: document.getElementById('wordByWordBtn')
       };
 
       function stripPunctuation(text) {
@@ -892,6 +958,12 @@
       }
 
       function advanceLine() {
+        if (state.wordByWordPlaying) {
+          cancelWordByWord();
+          showWarning('Word-by-word playback cancelled.');
+          setTimeout(() => showWarning(''), 1500);
+        }
+
         const isLast = state.currentIndex >= state.lines.length - 1;
         if (isLast) {
           showSummary();
@@ -909,24 +981,124 @@
         }, 300);
       }
 
-      function playCurrentLine() {
-        if (!window.speechSynthesis) return;
-        const utterance = new SpeechSynthesisUtterance(state.lines[state.currentIndex]);
+      function resetCurrentLineText() {
+        const current = state.lines[state.currentIndex] || '';
+        els.currentLine.textContent = truncateLine(current, 100);
+      }
+
+      function renderWordSpans(words) {
+        els.currentLine.innerHTML = '';
+        words.forEach((word, i) => {
+          const span = document.createElement('span');
+          span.className = 'word-span';
+          span.textContent = word;
+          els.currentLine.appendChild(span);
+          if (i < words.length - 1) {
+            els.currentLine.appendChild(document.createTextNode(' '));
+          }
+        });
+      }
+
+      function finishWordByWord() {
+        state.wordByWordPlaying = false;
+        els.playBtn.disabled = false;
+      }
+
+      function cancelWordByWord() {
+        if (!state.wordByWordPlaying) return;
+        state.wordByWordPlaying = false;
+        state.wordByWordToken++;
+        if (window.speechSynthesis) {
+          window.speechSynthesis.cancel();
+        }
+        els.playBtn.disabled = false;
+        resetCurrentLineText();
+      }
+
+      function speakNextWord(words, index, token) {
+        if (!state.wordByWordPlaying || state.wordByWordToken !== token) return;
+
+        const spans = els.currentLine.querySelectorAll('.word-span');
+        if (index >= words.length || index >= spans.length) {
+          finishWordByWord();
+          return;
+        }
+
+        spans.forEach((span, i) => {
+          span.classList.remove('active');
+          if (i < index) {
+            span.classList.add('done');
+          } else {
+            span.classList.remove('done');
+          }
+        });
+        spans[index].classList.add('active');
+
+        const utterance = new SpeechSynthesisUtterance(words[index]);
         utterance.lang = state.language;
         const voice = getVoiceForLanguage();
         if (voice) utterance.voice = voice;
-        utterance.rate = 0.9;
+        utterance.rate = 0.85;
 
-        els.playBtn.disabled = true;
         utterance.onend = function() {
-          els.playBtn.disabled = false;
+          if (state.wordByWordToken !== token) return;
+          spans[index].classList.remove('active');
+          spans[index].classList.add('done');
+          speakNextWord(words, index + 1, token);
         };
+
         utterance.onerror = function() {
-          els.playBtn.disabled = false;
+          if (state.wordByWordToken !== token) return;
+          finishWordByWord();
         };
+
+        window.speechSynthesis.speak(utterance);
+      }
+
+      function playWordByWord() {
+        if (!window.speechSynthesis) return;
+        const line = state.lines[state.currentIndex] || '';
+        const words = line.split(' ').filter(w => w.length > 0);
+        if (words.length === 0) return;
 
         window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(utterance);
+        state.wordByWordToken++;
+        const token = state.wordByWordToken;
+        state.wordByWordPlaying = true;
+        els.playBtn.disabled = true;
+        renderWordSpans(words);
+        speakNextWord(words, 0, token);
+      }
+
+      function playCurrentLine() {
+        if (!window.speechSynthesis) return;
+
+        if (state.wordByWordPlaying) {
+          state.wordByWordPlaying = false;
+          window.speechSynthesis.cancel();
+        }
+
+        if (state.wordByWord) {
+          playWordByWord();
+        } else {
+          resetCurrentLineText();
+          const utterance = new SpeechSynthesisUtterance(state.lines[state.currentIndex]);
+          utterance.lang = state.language;
+          const voice = getVoiceForLanguage();
+          if (voice) utterance.voice = voice;
+          utterance.rate = 0.9;
+
+          els.playBtn.disabled = true;
+          utterance.onend = function() {
+            els.playBtn.disabled = false;
+          };
+          utterance.onerror = function() {
+            els.playBtn.disabled = false;
+          };
+
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(utterance);
+        }
       }
 
       function startRecording() {
@@ -985,9 +1157,12 @@
       }
 
       function resetApp() {
+        cancelWordByWord();
         state.lines = [];
         state.currentIndex = 0;
         state.scores = [];
+        state.wordByWord = false;
+        els.wordByWordBtn.classList.remove('selected');
 
         els.lyricsInput.value = '';
         els.inputError.textContent = '';
@@ -999,6 +1174,8 @@
       }
 
       function selectLanguage(btn) {
+        cancelWordByWord();
+        resetCurrentLineText();
         els.langButtons.forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
         state.language = btn.dataset.lang;
@@ -1019,11 +1196,20 @@
         btn.addEventListener('click', () => selectLanguage(btn));
       });
 
+      function toggleWordByWord() {
+        state.wordByWord = !state.wordByWord;
+        els.wordByWordBtn.classList.toggle('selected', state.wordByWord);
+        if (state.wordByWordPlaying) {
+          cancelWordByWord();
+        }
+      }
+
       els.startBtn.addEventListener('click', startPractice);
       els.playBtn.addEventListener('click', playCurrentLine);
       els.recordBtn.addEventListener('click', startRecording);
       els.nextBtn.addEventListener('click', advanceLine);
       els.practiceAgainBtn.addEventListener('click', resetApp);
+      els.wordByWordBtn.addEventListener('click', toggleWordByWord);
 
       // Keyboard shortcut: space to start/stop recording
       document.addEventListener('keydown', function(e) {
