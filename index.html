@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Song Pronunciation Trainer</title>
+  <style>
+    :root {
+      --bg: #0d0d14;
+      --panel-bg: #16161f;
+      --panel-border: #2a2a3a;
+      --text: #e8e8f0;
+      --muted: #8888a0;
+      --accent: #7c5cfc;
+      --accent-hover: #9b7cff;
+      --success: #00cc66;
+      --warning: #ffaa00;
+      --danger: #ff4444;
+      --record-active: #ff3344;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 32px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.75rem;
+      margin: 0 0 24px;
+      color: var(--text);
+    }
+
+    .language-selector {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .language-selector button {
+      flex: 1;
+      padding: 14px 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 10px;
+      border: 2px solid var(--accent);
+      background-color: transparent;
+      color: var(--text);
+      cursor: pointer;
+      transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+    }
+
+    .language-selector button:hover {
+      background-color: rgba(124, 92, 252, 0.15);
+    }
+
+    .language-selector button.selected {
+      background-color: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .language-selector button.selected:hover {
+      background-color: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+
+    .card {
+      background-color: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 24px;
+    }
+
+    .input-section textarea {
+      width: 100%;
+      min-height: 220px;
+      padding: 16px;
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 1.125rem;
+      line-height: 1.7;
+      resize: vertical;
+    }
+
+    .input-section textarea::placeholder {
+      color: var(--muted);
+    }
+
+    .input-section textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .error-message {
+      color: var(--danger);
+      margin-top: 12px;
+      font-size: 0.95rem;
+      min-height: 1.5em;
+    }
+
+    .warning-banner {
+      background-color: rgba(255, 170, 0, 0.12);
+      border: 1px solid rgba(255, 170, 0, 0.35);
+      color: var(--warning);
+      padding: 12px 16px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      font-size: 0.95rem;
+    }
+
+    .start-btn {
+      width: 100%;
+      margin-top: 16px;
+      padding: 16px;
+      font-size: 1.125rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      background-color: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .start-btn:hover {
+      background-color: var(--accent-hover);
+    }
+
+    .start-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .practice-section {
+      display: none;
+    }
+
+    .practice-section.active {
+      display: block;
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 28px;
+      background-color: var(--bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background-color: var(--accent);
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+
+    .progress-bar-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+      font-size: 0.85rem;
+      color: var(--text);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+      pointer-events: none;
+    }
+
+    .teleprompter {
+      text-align: center;
+      margin-bottom: 24px;
+      padding: 32px 16px;
+      background-color: var(--bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 16px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .line-context {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 1.25rem;
+      color: var(--muted);
+      opacity: 0.6;
+      min-height: 1.6em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .line-context.next {
+      opacity: 0.4;
+    }
+
+    .line-current {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 2.5rem;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.3;
+      min-height: 2.6em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+
+    .line-current.slide-out {
+      transform: translateX(-40px);
+      opacity: 0;
+    }
+
+    .line-counter {
+      font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .control-btn {
+      flex: 1;
+      padding: 16px 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      background-color: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.2s, opacity 0.2s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .control-btn:hover:not(:disabled) {
+      background-color: var(--accent-hover);
+    }
+
+    .control-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .control-btn.recording {
+      background-color: var(--record-active);
+      animation: pulse 1.2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.75; }
+    }
+
+    .score-panel {
+      background-color: var(--bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 20px;
+    }
+
+    .score-panel.hidden {
+      display: none;
+    }
+
+    .score-display {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .score-value {
+      font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+      font-size: 3rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .score-label {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .score-details {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .detail-box {
+      background-color: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .detail-label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .detail-value {
+      font-size: 0.95rem;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .detail-value.italic {
+      font-style: italic;
+    }
+
+    .accuracy-bar {
+      width: 100%;
+      height: 10px;
+      background-color: var(--panel-bg);
+      border-radius: 5px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .accuracy-fill {
+      height: 100%;
+      background-color: var(--accent);
+      transition: width 0.4s ease;
+    }
+
+    .tips {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 10px;
+      background-color: rgba(124, 92, 252, 0.12);
+      color: var(--text);
+      font-size: 0.95rem;
+      text-align: center;
+    }
+
+    .tips.danger {
+      background-color: rgba(255, 68, 68, 0.12);
+    }
+
+    .summary-section {
+      display: none;
+    }
+
+    .summary-section.active {
+      display: block;
+    }
+
+    .summary-title {
+      text-align: center;
+      font-size: 1.75rem;
+      margin-bottom: 24px;
+    }
+
+    .summary-score {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .summary-score-value {
+      font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+      font-size: 4rem;
+      font-weight: 700;
+    }
+
+    .summary-score-label {
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .summary-box {
+      background-color: var(--bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .summary-box.full-width {
+      grid-column: 1 / -1;
+    }
+
+    .summary-box-label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .summary-box-value {
+      font-size: 1.1rem;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .summary-box-preview {
+      font-family: Georgia, "Times New Roman", serif;
+      font-style: italic;
+      font-size: 1rem;
+      color: var(--muted);
+      margin-top: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .practice-again-btn {
+      width: 100%;
+      padding: 16px;
+      font-size: 1.125rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      background-color: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .practice-again-btn:hover {
+      background-color: var(--accent-hover);
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 16px;
+      }
+
+      h1 {
+        font-size: 1.5rem;
+      }
+
+      .language-selector button {
+        padding: 12px 4px;
+        font-size: 0.9rem;
+      }
+
+      .line-current {
+        font-size: 1.5rem;
+        min-height: 2em;
+      }
+
+      .line-context {
+        font-size: 1rem;
+      }
+
+      .controls {
+        flex-direction: column;
+      }
+
+      .control-btn {
+        width: 100%;
+      }
+
+      .score-details {
+        grid-template-columns: 1fr;
+      }
+
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .score-value {
+        font-size: 2.5rem;
+      }
+
+      .summary-score-value {
+        font-size: 3rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎵 Song Pronunciation Trainer</h1>
+
+    <div class="language-selector" id="languageSelector">
+      <button data-lang="fr-FR" data-name="French" data-voice-lang="fr">Français</button>
+      <button data-lang="de-DE" data-name="German" data-voice-lang="de">Deutsch</button>
+      <button data-lang="it-IT" data-name="Italian" data-voice-lang="it">Italiano</button>
+    </div>
+
+    <div id="warningBanner"></div>
+
+    <section class="input-section card" id="inputSection">
+      <textarea id="lyricsInput" placeholder="Paste your song lyrics here..." spellcheck="false"></textarea>
+      <div class="error-message" id="inputError"></div>
+      <button class="start-btn" id="startBtn">Start Practice</button>
+    </section>
+
+    <section class="practice-section card" id="practiceSection">
+      <div class="progress-bar-container">
+        <div class="progress-bar-fill" id="progressBarFill"></div>
+        <div class="progress-bar-text" id="progressBarText">0/0</div>
+      </div>
+
+      <div class="teleprompter" id="teleprompter">
+        <div class="line-context" id="prevLine"></div>
+        <div class="line-current" id="currentLine"></div>
+        <div class="line-context next" id="nextLine"></div>
+        <div class="line-counter" id="lineCounter"></div>
+      </div>
+
+      <div class="controls">
+        <button class="control-btn" id="playBtn">🔊 Play</button>
+        <button class="control-btn" id="recordBtn">🎤 Record</button>
+        <button class="control-btn" id="nextBtn">⏭ Next</button>
+      </div>
+
+      <div class="score-panel hidden" id="scorePanel">
+        <div class="score-display">
+          <div class="score-value" id="scoreValue">--</div>
+          <div class="score-label">Pronunciation Score</div>
+        </div>
+        <div class="score-details">
+          <div class="detail-box full-width">
+            <div class="detail-label">You said</div>
+            <div class="detail-value italic" id="youSaid">--</div>
+          </div>
+          <div class="detail-box full-width">
+            <div class="detail-label">Reference</div>
+            <div class="detail-value" id="referenceLine">--</div>
+          </div>
+          <div class="detail-box">
+            <div class="detail-label">Confidence</div>
+            <div class="detail-value" id="confidenceValue">--</div>
+          </div>
+          <div class="detail-box">
+            <div class="detail-label">Accuracy</div>
+            <div class="detail-value" id="accuracyValue">--</div>
+            <div class="accuracy-bar">
+              <div class="accuracy-fill" id="accuracyFill"></div>
+            </div>
+          </div>
+        </div>
+        <div class="tips" id="tips"></div>
+      </div>
+    </section>
+
+    <section class="summary-section card" id="summarySection">
+      <div class="summary-title">🎉 Session Complete!</div>
+      <div class="summary-score">
+        <div class="summary-score-value" id="summaryOverallScore">--</div>
+        <div class="summary-score-label">Overall Score</div>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-box">
+          <div class="summary-box-label">Language Practiced</div>
+          <div class="summary-box-value" id="summaryLanguage">--</div>
+        </div>
+        <div class="summary-box">
+          <div class="summary-box-label">Total Lines Completed</div>
+          <div class="summary-box-value" id="summaryTotalLines">--</div>
+        </div>
+        <div class="summary-box">
+          <div class="summary-box-label">Best Line</div>
+          <div class="summary-box-value" id="summaryBestLine">--</div>
+          <div class="summary-box-preview" id="summaryBestPreview"></div>
+        </div>
+        <div class="summary-box">
+          <div class="summary-box-label">Worst Line</div>
+          <div class="summary-box-value" id="summaryWorstLine">--</div>
+          <div class="summary-box-preview" id="summaryWorstPreview"></div>
+        </div>
+      </div>
+      <button class="practice-again-btn" id="practiceAgainBtn">Practice Again</button>
+    </section>
+  </div>
+
+  <script>
+    (function() {
+      const state = {
+        language: 'fr-FR',
+        languageName: 'French',
+        voiceLang: 'fr',
+        lines: [],
+        currentIndex: 0,
+        scores: [],
+        isRecording: false,
+        recognition: null,
+        voices: []
+      };
+
+      const els = {
+        langButtons: document.querySelectorAll('#languageSelector button'),
+        inputSection: document.getElementById('inputSection'),
+        practiceSection: document.getElementById('practiceSection'),
+        summarySection: document.getElementById('summarySection'),
+        lyricsInput: document.getElementById('lyricsInput'),
+        startBtn: document.getElementById('startBtn'),
+        inputError: document.getElementById('inputError'),
+        warningBanner: document.getElementById('warningBanner'),
+        prevLine: document.getElementById('prevLine'),
+        currentLine: document.getElementById('currentLine'),
+        nextLine: document.getElementById('nextLine'),
+        lineCounter: document.getElementById('lineCounter'),
+        playBtn: document.getElementById('playBtn'),
+        recordBtn: document.getElementById('recordBtn'),
+        nextBtn: document.getElementById('nextBtn'),
+        scorePanel: document.getElementById('scorePanel'),
+        scoreValue: document.getElementById('scoreValue'),
+        youSaid: document.getElementById('youSaid'),
+        referenceLine: document.getElementById('referenceLine'),
+        confidenceValue: document.getElementById('confidenceValue'),
+        accuracyValue: document.getElementById('accuracyValue'),
+        accuracyFill: document.getElementById('accuracyFill'),
+        tips: document.getElementById('tips'),
+        progressBarFill: document.getElementById('progressBarFill'),
+        progressBarText: document.getElementById('progressBarText'),
+        summaryOverallScore: document.getElementById('summaryOverallScore'),
+        summaryLanguage: document.getElementById('summaryLanguage'),
+        summaryTotalLines: document.getElementById('summaryTotalLines'),
+        summaryBestLine: document.getElementById('summaryBestLine'),
+        summaryBestPreview: document.getElementById('summaryBestPreview'),
+        summaryWorstLine: document.getElementById('summaryWorstLine'),
+        summaryWorstPreview: document.getElementById('summaryWorstPreview'),
+        practiceAgainBtn: document.getElementById('practiceAgainBtn')
+      };
+
+      function stripPunctuation(text) {
+        return text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+      }
+
+      function getScoreColorClass(score) {
+        if (score >= 80) return 'success';
+        if (score >= 50) return 'warning';
+        return 'danger';
+      }
+
+      function getScoreColor(score) {
+        if (score >= 80) return '#00cc66';
+        if (score >= 50) return '#ffaa00';
+        return '#ff4444';
+      }
+
+      function getTip(score, wordMatch) {
+        if (score === 0) return 'No speech detected. Try speaking louder or check your microphone.';
+        if (score >= 70) return 'Great job! Keep practicing for fluency.';
+        if (wordMatch < 50) return 'Check vowel sounds and word endings.';
+        if (score < 60) return 'Slow down and focus on each syllable.';
+        return 'Try again and listen to the reference first.';
+      }
+
+      function truncateLine(line, maxLen) {
+        if (!line) return '';
+        if (line.length <= maxLen) return line;
+        return line.slice(0, maxLen) + '…';
+      }
+
+      function loadVoices() {
+        state.voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+      }
+
+      function getVoiceForLanguage(lang) {
+        const short = state.voiceLang;
+        let voice = state.voices.find(v => v.lang === state.language && !v.default);
+        if (!voice) voice = state.voices.find(v => v.lang.startsWith(short));
+        if (!voice) voice = state.voices.find(v => v.lang.startsWith(short + '-'));
+        if (!voice) voice = state.voices.find(v => v.lang.toLowerCase().includes(short));
+        return voice || null;
+      }
+
+      function showWarning(message) {
+        if (!message) {
+          els.warningBanner.innerHTML = '';
+          els.warningBanner.className = '';
+          return;
+        }
+        els.warningBanner.innerHTML = message;
+        els.warningBanner.className = 'warning-banner';
+      }
+
+      function initSpeechRecognition() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+          showWarning('⚠️ Speech recognition is not supported in your browser. Try Chrome or Edge.');
+          els.recordBtn.disabled = true;
+          return;
+        }
+
+        state.recognition = new SpeechRecognition();
+        state.recognition.continuous = false;
+        state.recognition.interimResults = false;
+        state.recognition.lang = state.language;
+
+        state.recognition.onstart = function() {
+          state.isRecording = true;
+          els.recordBtn.textContent = '🔴 Recording...';
+          els.recordBtn.classList.add('recording');
+          els.recordBtn.disabled = true;
+          els.nextBtn.disabled = true;
+          hideScore();
+        };
+
+        state.recognition.onresult = function(event) {
+          const result = event.results[0];
+          const transcript = result[0].transcript;
+          const confidence = result[0].confidence || 0;
+          handleRecordingResult(transcript, confidence);
+        };
+
+        state.recognition.onerror = function(event) {
+          if (event.error === 'not-allowed') {
+            els.inputError.textContent = '🎤 Microphone access denied. Please allow microphone access in your browser settings.';
+          } else if (event.error === 'no-speech') {
+            handleRecordingResult('', 0);
+          } else if (event.error === 'aborted') {
+            // ignore
+          } else {
+            els.inputError.textContent = 'Recording interrupted.';
+          }
+          resetRecordingUI();
+        };
+
+        state.recognition.onend = function() {
+          if (state.isRecording) {
+            // No result received before end — treat as no speech
+            handleRecordingResult('', 0);
+          }
+          resetRecordingUI();
+        };
+      }
+
+      function resetRecordingUI() {
+        state.isRecording = false;
+        els.recordBtn.textContent = '🎤 Record';
+        els.recordBtn.classList.remove('recording');
+        els.recordBtn.disabled = false;
+        els.nextBtn.disabled = false;
+      }
+
+      function handleRecordingResult(transcript, confidence) {
+        state.isRecording = false;
+        const reference = state.lines[state.currentIndex];
+        const result = calculateScore(transcript, reference, confidence);
+        state.scores[state.currentIndex] = result;
+        displayScore(transcript, reference, result);
+        resetRecordingUI();
+      }
+
+      function calculateScore(transcript, reference, confidence) {
+        const refClean = stripPunctuation(reference);
+        const transClean = stripPunctuation(transcript || '');
+
+        const refWords = refClean.split(' ').filter(w => w.length > 0);
+        const transWords = transClean.split(' ').filter(w => w.length > 0);
+
+        let matches = 0;
+        const transBag = {};
+        transWords.forEach(w => { transBag[w] = (transBag[w] || 0) + 1; });
+
+        refWords.forEach(w => {
+          if (transBag[w] && transBag[w] > 0) {
+            matches++;
+            transBag[w]--;
+          }
+        });
+
+        const wordMatchPct = refWords.length > 0 ? (matches / refWords.length) * 100 : 0;
+        const confidenceScore = (confidence || 0) * 100;
+        let finalScore = Math.round((confidenceScore * 0.4) + (wordMatchPct * 0.6));
+        finalScore = Math.max(0, Math.min(100, finalScore));
+
+        return {
+          confidence: confidenceScore,
+          wordMatch: wordMatchPct,
+          final: finalScore
+        };
+      }
+
+      function displayScore(transcript, reference, result) {
+        els.scorePanel.classList.remove('hidden');
+        els.scoreValue.textContent = result.final + '%';
+        els.scoreValue.style.color = getScoreColor(result.final);
+        els.youSaid.textContent = transcript || '(no speech detected)';
+        els.referenceLine.textContent = reference;
+        els.confidenceValue.textContent = Math.round(result.confidence) + '%';
+        els.accuracyValue.textContent = Math.round(result.wordMatch) + '%';
+        els.accuracyFill.style.width = Math.round(result.wordMatch) + '%';
+        els.accuracyFill.style.backgroundColor = getScoreColor(result.wordMatch);
+
+        const tip = getTip(result.final, result.wordMatch);
+        els.tips.textContent = tip;
+        els.tips.className = 'tips' + (result.final < 50 ? ' danger' : '');
+      }
+
+      function hideScore() {
+        els.scorePanel.classList.add('hidden');
+      }
+
+      function updateTeleprompter() {
+        const idx = state.currentIndex;
+        const prev = state.lines[idx - 1] || '';
+        const current = state.lines[idx] || '';
+        const next = state.lines[idx + 1] || '';
+
+        els.prevLine.textContent = prev ? truncateLine(prev, 70) : '';
+        els.currentLine.textContent = truncateLine(current, 100);
+        els.nextLine.textContent = next ? truncateLine(next, 70) : '';
+        els.lineCounter.textContent = `Line ${idx + 1} of ${state.lines.length}`;
+      }
+
+      function updateProgress() {
+        const pct = state.lines.length > 0 ? ((state.currentIndex + 1) / state.lines.length) * 100 : 0;
+        els.progressBarFill.style.width = pct + '%';
+        els.progressBarText.textContent = `${state.currentIndex + 1}/${state.lines.length}`;
+      }
+
+      function updateNextButton() {
+        const isLast = state.currentIndex >= state.lines.length - 1;
+        els.nextBtn.textContent = isLast ? '⏭ Finish' : '⏭ Next';
+      }
+
+      function startPractice() {
+        const rawText = els.lyricsInput.value;
+        const parsed = rawText
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => {
+            if (line.length < 3) return false;
+            const alphaNum = line.replace(/[^\p{L}\p{N}]/gu, '');
+            return alphaNum.length >= 3;
+          });
+
+        if (parsed.length === 0) {
+          els.inputError.textContent = 'Please paste song lyrics first';
+          return;
+        }
+
+        els.inputError.textContent = '';
+        state.lines = parsed;
+        state.currentIndex = 0;
+        state.scores = new Array(parsed.length).fill(null);
+
+        els.inputSection.style.display = 'none';
+        els.practiceSection.classList.add('active');
+        els.summarySection.classList.remove('active');
+
+        updateTeleprompter();
+        updateProgress();
+        updateNextButton();
+        hideScore();
+      }
+
+      function advanceLine() {
+        const isLast = state.currentIndex >= state.lines.length - 1;
+        if (isLast) {
+          showSummary();
+          return;
+        }
+
+        els.currentLine.classList.add('slide-out');
+        setTimeout(() => {
+          state.currentIndex++;
+          updateTeleprompter();
+          updateProgress();
+          updateNextButton();
+          hideScore();
+          els.currentLine.classList.remove('slide-out');
+        }, 300);
+      }
+
+      function playCurrentLine() {
+        if (!window.speechSynthesis) return;
+        const utterance = new SpeechSynthesisUtterance(state.lines[state.currentIndex]);
+        utterance.lang = state.language;
+        const voice = getVoiceForLanguage();
+        if (voice) utterance.voice = voice;
+        utterance.rate = 0.9;
+
+        els.playBtn.disabled = true;
+        utterance.onend = function() {
+          els.playBtn.disabled = false;
+        };
+        utterance.onerror = function() {
+          els.playBtn.disabled = false;
+        };
+
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+      }
+
+      function startRecording() {
+        if (!state.recognition) {
+          initSpeechRecognition();
+        }
+        if (!state.recognition) return;
+
+        els.inputError.textContent = '';
+        state.recognition.lang = state.language;
+        try {
+          state.recognition.start();
+        } catch (e) {
+          // Already started or other error
+        }
+      }
+
+      function showSummary() {
+        els.practiceSection.classList.remove('active');
+        els.summarySection.classList.add('active');
+
+        const completedScores = state.scores.filter(s => s !== null);
+        const totalCompleted = completedScores.length;
+        const average = totalCompleted > 0
+          ? Math.round(completedScores.reduce((sum, s) => sum + s.final, 0) / totalCompleted)
+          : 0;
+
+        let best = null;
+        let worst = null;
+        state.scores.forEach((s, idx) => {
+          if (!s) return;
+          if (!best || s.final > best.score.final) best = { index: idx, score: s };
+          if (!worst || s.final < worst.score.final) worst = { index: idx, score: s };
+        });
+
+        els.summaryOverallScore.textContent = average + '%';
+        els.summaryOverallScore.style.color = getScoreColor(average);
+        els.summaryLanguage.textContent = state.languageName;
+        els.summaryTotalLines.textContent = totalCompleted;
+
+        if (best) {
+          els.summaryBestLine.textContent = `Line ${best.index + 1} · ${best.score.final}%`;
+          els.summaryBestPreview.textContent = truncateLine(state.lines[best.index], 60);
+        } else {
+          els.summaryBestLine.textContent = '--';
+          els.summaryBestPreview.textContent = '';
+        }
+
+        if (worst) {
+          els.summaryWorstLine.textContent = `Line ${worst.index + 1} · ${worst.score.final}%`;
+          els.summaryWorstPreview.textContent = truncateLine(state.lines[worst.index], 60);
+        } else {
+          els.summaryWorstLine.textContent = '--';
+          els.summaryWorstPreview.textContent = '';
+        }
+      }
+
+      function resetApp() {
+        state.lines = [];
+        state.currentIndex = 0;
+        state.scores = [];
+
+        els.lyricsInput.value = '';
+        els.inputError.textContent = '';
+        els.inputSection.style.display = 'block';
+        els.practiceSection.classList.remove('active');
+        els.summarySection.classList.remove('active');
+        els.progressBarFill.style.width = '0%';
+        els.progressBarText.textContent = '0/0';
+      }
+
+      function selectLanguage(btn) {
+        els.langButtons.forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        state.language = btn.dataset.lang;
+        state.languageName = btn.dataset.name;
+        state.voiceLang = btn.dataset.voiceLang;
+      }
+
+      // Initialize
+      if (window.speechSynthesis) {
+        loadVoices();
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+      }
+
+      initSpeechRecognition();
+      selectLanguage(els.langButtons[0]);
+
+      els.langButtons.forEach(btn => {
+        btn.addEventListener('click', () => selectLanguage(btn));
+      });
+
+      els.startBtn.addEventListener('click', startPractice);
+      els.playBtn.addEventListener('click', playCurrentLine);
+      els.recordBtn.addEventListener('click', startRecording);
+      els.nextBtn.addEventListener('click', advanceLine);
+      els.practiceAgainBtn.addEventListener('click', resetApp);
+
+      // Keyboard shortcut: space to start/stop recording
+      document.addEventListener('keydown', function(e) {
+        if (e.code === 'Space' && els.practiceSection.classList.contains('active')) {
+          const activeTag = document.activeElement.tagName.toLowerCase();
+          if (activeTag !== 'button' && activeTag !== 'textarea') {
+            e.preventDefault();
+            if (state.isRecording) {
+              try { state.recognition.stop(); } catch (err) {}
+            } else {
+              startRecording();
+            }
+          }
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
