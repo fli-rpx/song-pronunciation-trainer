@@ -206,6 +206,26 @@
       border-color: var(--accent);
     }
 
+    .input-section label {
+      display: block;
+      margin: 16px 0 6px;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    .translation-line {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 1.2rem;
+      font-style: italic;
+      color: #8888a0;
+      margin-top: 8px;
+      min-height: 1.2em;
+    }
+
+    .translation-line:empty {
+      display: none;
+    }
+
     .error-message {
       color: var(--danger);
       margin-top: 12px;
@@ -634,6 +654,7 @@
       <button data-lang="de-DE" data-name="German" data-voice-lang="de">Deutsch</button>
       <button data-lang="it-IT" data-name="Italian" data-voice-lang="it">Italiano</button>
       <button data-lang="es-ES" data-name="Español" data-voice-lang="es-ES">Español</button>
+      <button data-lang="ru-RU" data-name="Russian" data-voice-lang="ru-RU">Русский</button>
     </div>
 
     <div class="word-by-word-selector" id="wordByWordSelector">
@@ -652,6 +673,8 @@
 
     <section class="input-section card" id="inputSection">
       <textarea id="lyricsInput" placeholder="Paste your song lyrics here..." spellcheck="false"></textarea>
+      <label for="translationInput">English Translation</label>
+      <textarea id="translationInput" placeholder="Paste English translation here, one line per line..." spellcheck="false"></textarea>
       <div class="error-message" id="inputError"></div>
       <button class="start-btn" id="startBtn">Start Practice</button>
     </section>
@@ -665,6 +688,7 @@
       <div class="teleprompter" id="teleprompter">
         <div class="line-context" id="prevLine"></div>
         <div class="line-current" id="currentLine"></div>
+        <div class="translation-line" id="translationLine"></div>
         <div class="line-context next" id="nextLine"></div>
         <div class="line-counter" id="lineCounter"></div>
       </div>
@@ -744,6 +768,7 @@
         languageName: 'French',
         voiceLang: 'fr',
         lines: [],
+        translations: [],
         currentIndex: 0,
         currentWordIndex: 0,
         scores: [],
@@ -762,11 +787,13 @@
         practiceSection: document.getElementById('practiceSection'),
         summarySection: document.getElementById('summarySection'),
         lyricsInput: document.getElementById('lyricsInput'),
+        translationInput: document.getElementById('translationInput'),
         startBtn: document.getElementById('startBtn'),
         inputError: document.getElementById('inputError'),
         warningBanner: document.getElementById('warningBanner'),
         prevLine: document.getElementById('prevLine'),
         currentLine: document.getElementById('currentLine'),
+        translationLine: document.getElementById('translationLine'),
         nextLine: document.getElementById('nextLine'),
         lineCounter: document.getElementById('lineCounter'),
         playBtn: document.getElementById('playBtn'),
@@ -977,6 +1004,7 @@
         els.currentLine.textContent = truncateLine(current, 100);
         els.nextLine.textContent = next ? truncateLine(next, 70) : '';
         els.lineCounter.textContent = `Line ${idx + 1} of ${state.lines.length}`;
+        els.translationLine.textContent = state.translations[idx] || '';
       }
 
       function updateProgress() {
@@ -1008,6 +1036,10 @@
 
         els.inputError.textContent = '';
         state.lines = parsed;
+        state.translations = els.translationInput.value
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line.length > 0);
         state.currentIndex = 0;
         state.currentWordIndex = 0;
         state.scores = new Array(parsed.length).fill(null);
@@ -1343,6 +1375,8 @@
         els.wordByWordBtn.classList.remove('selected');
 
         els.lyricsInput.value = '';
+        els.translationInput.value = '';
+        state.translations = [];
         els.inputError.textContent = '';
         els.inputSection.style.display = 'block';
         els.practiceSection.classList.remove('active');
