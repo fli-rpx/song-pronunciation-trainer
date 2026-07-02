@@ -161,6 +161,7 @@
       display: inline-block;
       margin: 0 0.15em;
       overflow-wrap: break-word;
+      word-break: break-word;
       transition: all 0.15s ease;
     }
 
@@ -346,6 +347,7 @@
       display: flex;
       flex-wrap: wrap;
       align-items: center;
+      align-content: center;
       justify-content: center;
       transition: transform 0.3s ease, opacity 0.3s ease;
     }
@@ -1134,14 +1136,11 @@
 
       function renderWordSpans(words) {
         els.currentLine.innerHTML = '';
-        words.forEach((word, i) => {
+        words.forEach((word) => {
           const span = document.createElement('span');
           span.className = 'word-span';
           span.textContent = word;
           els.currentLine.appendChild(span);
-          if (i < words.length - 1) {
-            els.currentLine.appendChild(document.createTextNode(' '));
-          }
         });
       }
 
